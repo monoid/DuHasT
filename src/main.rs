@@ -16,5 +16,5 @@ fn main() {
         dht::Config::new(&mut chacha)
     };
     cfg.write(dht::DEFAULT_STATE_PATH).unwrap();
-    println!("Hello, world!");
+    println!("{}", cfg.dht_id);
 }

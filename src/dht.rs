@@ -4,6 +4,7 @@ extern crate serde_bencode;
 
 use std::fs::File;
 use std::io::{Read, Write};
+use std::fmt;
 
 use rand::{CryptoRng, SeedableRng, Rng, RngCore};
 use rand::rngs::OsRng;
@@ -20,6 +21,15 @@ pub(crate) struct DhtId {
     buf: KeyBuf,
 }
 
+impl fmt::Display for DhtId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result  {
+        for b in &self.buf {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
 impl DhtId {
     pub(crate) fn new<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut buf: KeyBuf = Default::default();
@@ -30,7 +40,7 @@ impl DhtId {
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct Config {
-    dht_id: DhtId,
+    pub(crate) dht_id: DhtId,
     peers: Vec<String>,  // String is a stub here.
 }
 

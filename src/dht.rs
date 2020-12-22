@@ -1,6 +1,6 @@
 extern crate rand_chacha;
 extern crate rand_core;
-extern crate serde_bencode;
+extern crate serde_bencoded;
 
 use std::fmt;
 use std::fs::File;
@@ -237,15 +237,15 @@ impl Config {
         }
     }
 
-    pub(crate) fn load(filename: &str) -> Result<Config, serde_bencode::Error> {
+    pub(crate) fn load(filename: &str) -> Result<Config, serde_bencoded::DeError> {
         let mut file = File::open(filename).unwrap();
         let mut config_data = vec![];
         file.read_to_end(&mut config_data).unwrap();
-        serde_bencode::from_bytes::<Config>(&config_data)
+        serde_bencoded::from_bytes::<Config>(&config_data)
     }
 
-    pub(crate) fn write(&self, filename: &str) -> Result<(), serde_bencode::Error> {
-        let config_data = serde_bencode::to_bytes(self)?;
+    pub(crate) fn write(&self, filename: &str) -> Result<(), serde_bencoded::SerError> {
+        let config_data = serde_bencoded::to_vec(self)?;
         let mut file = File::create(filename).unwrap();
         file.write(&config_data).unwrap();
         Ok(())
@@ -265,19 +265,19 @@ mod tests {
 
     #[test]
     fn test_unpack_ping_query() -> Result<(), Box<dyn Error>> {
-        // const DATA: &'static [u8] = b"d1:q4:ping1:ad2:id20:abcdefghij0123456789ee";
-        const DATA: [u8; 43] = [
-            100u8, 49, 58, 97, 100, 50, 58, 105, 100, 50, 48, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 49, 58, 113, 52, 58, 112, 105, 110, 103, 101,
-        ];
-        let err: Query = serde_bencode::from_bytes(&DATA)?;
+        const DATA: &'static [u8] = b"d1:q4:ping1:ad2:id20:abcdefghij0123456789ee";
+        // const DATA: [u8; 43] = [
+        //     100u8, 49, 58, 97, 100, 50, 58, 105, 100, 50, 48, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        //     0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 49, 58, 113, 52, 58, 112, 105, 110, 103, 101,
+        // ];
+        let err: Query = serde_bencoded::from_bytes(&DATA)?;
         Ok(())
     }
 
     #[test]
     fn test_unpack_ping_query_1() -> Result<(), Box<dyn Error>> {
         const DATA: &'static [u8] = b"d2:id20:abcdefghij0123456789e";
-        let err: PingQuery = serde_bencode::from_bytes(DATA)?;
+        let err: PingQuery = serde_bencoded::from_bytes(DATA)?;
         Ok(())
     }
 
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_unpack_error_response() -> Result<(), Box<dyn Error>> {
         const DATA: &'static [u8] = b"d1:eli201e23:A Generic Error Ocurrede1:t2:aa1:y1:ee";
-        let err: Message<PingResponse> = serde_bencode::from_bytes(DATA)?;
+        let err: Message<PingResponse> = serde_bencoded::from_bytes(DATA)?;
 
         assert!(matches!(dbg!(err), Message::E{e: (201, _)}));
         Ok(())

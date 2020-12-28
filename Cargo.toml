@@ -10,8 +10,12 @@ edition = "2018"
 rand = "^0.7.0"
 rand_core = "^0.5.1"
 rand_chacha = "^0.2.2"
-serde_bencoded = "^0.1.1"
-serde = "^1.0.0"
-serde_derive = "^1.0.0"
+# serde_bencoded = "^0.1.1"
+serde_bencoded = { path = "../serde_bencoded" }
 serde_bytes = "0.11"
+# serde = { version = "1.0", features = ["derive"] }
 static_assertions = "*"
+serde = { path = "../serde/serde", features = ["derive"] }
+
+[patch.crates-io]
+serde = { path = "../serde/serde" }

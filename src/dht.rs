@@ -24,14 +24,46 @@ type KeyBuf = [u8; DHT_ID_BYTE_SIZE];
 type NodeBuf = [u8; NODE_ADDR_BYTE_SIZE];
 type ContactIdBuf = [u8; DHT_ID_BYTE_SIZE + NODE_ADDR_BYTE_SIZE];
 
+/// 20-byte node id/torrent id.
 #[derive(Clone, Default, PartialEq, Eq)]
-pub(crate) struct DhtId(KeyBuf);
+pub(crate) struct DhtId(pub(crate) KeyBuf);
 
 impl DhtId {
     pub(crate) fn new<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut buf: KeyBuf = Default::default();
         rng.fill(&mut buf);
         DhtId(buf)
+    }
+
+    pub(crate) fn from_str(s: &str) -> Result<Self, &'static str> {
+        if s.len() == 40 {
+            let mut buf: KeyBuf = Default::default();
+            // TODO: as_bytes().chunks(2) is a dirty hack.
+            for (b, c) in buf.iter_mut().zip(s.as_bytes().chunks(2).map(|x| std::str::from_utf8(x).unwrap())) {
+                *b = u8::from_str_radix(c, 16).map_err(|_| "malformed hex")?;
+            }
+            Ok(DhtId(buf))
+        } else {
+            Err("expecting 40 char string")
+        }
+    }
+}
+
+impl fmt::Display for DhtId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for DhtId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
     }
 }
 
@@ -42,12 +74,7 @@ impl Serialize for DhtId {
     }
 }
 
-impl Debug for DhtId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("{dht_id}")
-    }
-}
-
+/// Packed IPv4 + port address.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NodeAddr(NodeBuf);
 
@@ -89,8 +116,8 @@ impl<'de> Deserialize<'de> for NodeAddr {
     }
 }
 
-// Packed representation of DHT ID and ipv4/port pair.
-#[derive(PartialEq, Eq)]
+// node ID and ipv4/port pair packed together.
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct DhtContactId(ContactIdBuf);
 
 impl DhtContactId {
@@ -106,12 +133,6 @@ impl DhtContactId {
         debug_assert!(slice.is_empty());
 
         DhtContactId(buf)
-    }
-}
-
-impl Debug for DhtContactId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("{DHT_CONTACT_ID}")
     }
 }
 
@@ -149,15 +170,6 @@ impl<'de> serde::de::Visitor<'de> for DhtIdDeserializerVisitor {
 impl<'de> Deserialize<'de> for DhtId {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_bytes(DhtIdDeserializerVisitor)
-    }
-}
-
-impl fmt::Display for DhtId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in &self.0 {
-            write!(f, "{:02x}", b)?;
-        }
-        Ok(())
     }
 }
 
@@ -211,24 +223,24 @@ pub(crate) struct PingQuery {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
 pub(crate) struct FindNodeQuery {
-    id: DhtId,
-    target: DhtId,
+    pub(crate) id: DhtId,
+    pub(crate) target: DhtId,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
 pub(crate) struct GetPeersQuery {
-    id: DhtId,
-    info_hash: DhtId,
+    pub(crate) id: DhtId,
+    pub(crate) info_hash: DhtId,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
 pub(crate) struct AnnouncePeerQuery<'msg> {
-    id: DhtId,
-    info_hash: DhtId,
+    pub(crate) id: DhtId,
+    pub(crate) info_hash: DhtId,
     #[serde(borrow, with = "serde_bytes")]
-    token: Cow<'msg, [u8]>,
-    port: u16,
-    implied_port: u8,
+    pub(crate) token: Cow<'msg, [u8]>,
+    pub(crate) port: u16,
+    pub(crate) implied_port: u8,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
@@ -284,22 +296,23 @@ pub(crate) enum Message<'msg, R> {
     E { e: (ErrorKind, String) },
 }
 
-// When `y` is "q", it is an incoming query with new `tt` token.  When
-// `y` is "r" or "e", it is response to old quer with `tt` that should
+// When `y` is "q", it is an incoming query with new `t` token.  When
+// `y` is "r" or "e", it is response to old quer with `t` that should
 // be known, and with this knowledge one can parse it.
 #[derive(Deserialize, Debug, Eq, PartialEq)]
 pub(crate) struct IncomingMessage<'msg> {
     #[serde(borrow)]
-    y: &'msg str,
+    pub(crate) y: &'msg str,
     #[serde(borrow, with = "serde_bytes")]
-    tt: &'msg [u8],
+    pub(crate) t: &'msg [u8],
 }
 
 #[derive(Serialize, Debug)]
 pub(crate) struct OutgoingMessage<'msg, R> {
-    tt: Cow<'msg, [u8]>,
+    #[serde(borrow, with = "serde_bytes")]
+    pub(crate) t: Cow<'msg, [u8]>,
     #[serde(borrow, flatten)]
-    msg: Message<'msg, R>,
+    pub(crate) msg: Message<'msg, R>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -345,14 +358,14 @@ mod tests {
     #[test]
     fn test_unpack_incoming_msg() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
-            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:t2:aa1:y1:q2:tt2:\xFF\xFFe";
+            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:y1:q1:t2:\xFF\xFFe";
         let ping: IncomingMessage = serde_bencoded::from_bytes(&DATA)?;
 
         assert_eq!(
             ping,
             IncomingMessage {
                 y: "q",
-                tt: b"\xFF\xFF"
+                t: b"\xFF\xFF"
             }
         );
         Ok(())
@@ -361,7 +374,7 @@ mod tests {
     #[test]
     fn test_unpack_ping_query() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
-            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:t2:aa1:y1:q2:tt2:\xFF\xFFe";
+            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:t2:aa1:y1:q1:t2:\xFF\xFFe";
         let ping: Message<()> = serde_bencoded::from_bytes(&DATA)?;
 
         assert_eq!(

@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::net::Ipv4Addr;
 use std::net::SocketAddrV4;
 
 use fmt::Debug;
@@ -18,11 +19,12 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 const DHT_ID_BYTE_SIZE: usize = 160 / 8;
 // Standard 4 bytes IPv4 address + 2 bytes port
 const NODE_ADDR_BYTE_SIZE: usize = 6;
+const COMPACT_NODE_BYTE_SIZE: usize = DHT_ID_BYTE_SIZE + NODE_ADDR_BYTE_SIZE;
 pub(crate) const DEFAULT_STATE_PATH: &'static str = "duhast.state";
 
 type KeyBuf = [u8; DHT_ID_BYTE_SIZE];
 type NodeBuf = [u8; NODE_ADDR_BYTE_SIZE];
-type ContactIdBuf = [u8; DHT_ID_BYTE_SIZE + NODE_ADDR_BYTE_SIZE];
+type ContactIdBuf = [u8; COMPACT_NODE_BYTE_SIZE];
 
 /// 20-byte node id/torrent id.
 #[derive(Clone, Default, PartialEq, Eq)]
@@ -39,7 +41,11 @@ impl DhtId {
         if s.len() == 40 {
             let mut buf: KeyBuf = Default::default();
             // TODO: as_bytes().chunks(2) is a dirty hack.
-            for (b, c) in buf.iter_mut().zip(s.as_bytes().chunks(2).map(|x| std::str::from_utf8(x).unwrap())) {
+            for (b, c) in buf.iter_mut().zip(
+                s.as_bytes()
+                    .chunks(2)
+                    .map(|x| std::str::from_utf8(x).unwrap()),
+            ) {
                 *b = u8::from_str_radix(c, 16).map_err(|_| "malformed hex")?;
             }
             Ok(DhtId(buf))
@@ -173,9 +179,42 @@ impl<'de> Deserialize<'de> for DhtId {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct CompactNode {
+    pub(crate) id: DhtId,
+    pub(crate) ip: Ipv4Addr,
+    pub(crate) port: u16,
+}
 
-#[derive(Debug, PartialEq, Eq)]
+impl CompactNode {
+    fn unpack(buf: &[u8]) -> Self {
+        assert!(buf.len() == COMPACT_NODE_BYTE_SIZE);
+        let mut id: DhtId = Default::default();
+        id.0.copy_from_slice(&buf[..20]);
+        let ip = Ipv4Addr::new(buf[20], buf[21], buf[22], buf[23]);
+        let port = u16::from_le_bytes([buf[24], buf[25]]);
+        Self { id, ip, port }
+    }
+}
+
+#[derive(PartialEq, Eq)]
 pub(crate) struct CompactNodesList<'msg>(Cow<'msg, [u8]>);
+
+impl<'msg> CompactNodesList<'msg> {
+    fn iter(&'msg self) -> impl Iterator<Item = CompactNode> + 'msg {
+        self.0
+            .chunks(COMPACT_NODE_BYTE_SIZE)
+            .map(CompactNode::unpack)
+    }
+}
+
+impl Debug for CompactNodesList<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Slow, but works
+        let data: Vec<_> = self.iter().collect();
+        Debug::fmt(&data[..], f)
+    }
+}
 
 impl<'msg> Serialize for CompactNodesList<'msg> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -193,7 +232,7 @@ impl<'de> serde::de::Visitor<'de> for CompactNodesListDeserializerVisitor {
     }
 
     fn visit_borrowed_bytes<E: serde::de::Error>(self, v: &'de [u8]) -> Result<Self::Value, E> {
-        if v.len() % (DHT_ID_BYTE_SIZE + NODE_ADDR_BYTE_SIZE) == 0 {
+        if v.len() % COMPACT_NODE_BYTE_SIZE == 0 {
             Ok(CompactNodesList(Cow::Borrowed(v)))
         } else {
             Err(E::invalid_length(v.len(), &"divisible by 26 bytes"))
@@ -201,7 +240,7 @@ impl<'de> serde::de::Visitor<'de> for CompactNodesListDeserializerVisitor {
     }
 
     fn visit_byte_buf<E: serde::de::Error>(self, v: Vec<u8>) -> Result<Self::Value, E> {
-        if v.len() % (DHT_ID_BYTE_SIZE + NODE_ADDR_BYTE_SIZE) == 0 {
+        if v.len() % COMPACT_NODE_BYTE_SIZE == 0 {
             Ok(CompactNodesList(Cow::Owned(v)))
         } else {
             Err(E::invalid_length(v.len(), &"divisible by 26 bytes"))
@@ -357,8 +396,7 @@ mod tests {
 
     #[test]
     fn test_unpack_incoming_msg() -> Result<(), Box<dyn Error>> {
-        const DATA: &[u8] =
-            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:y1:q1:t2:\xFF\xFFe";
+        const DATA: &[u8] = b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:y1:q1:t2:\xFF\xFFe";
         let ping: IncomingMessage = serde_bencoded::from_bytes(&DATA)?;
 
         assert_eq!(

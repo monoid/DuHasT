@@ -228,7 +228,7 @@ impl<'de> serde::de::Visitor<'de> for CompactNodesListDeserializerVisitor {
     type Value = CompactNodesList<'de>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{} bytes", DHT_ID_BYTE_SIZE)
+        write!(formatter, "divisible by 26 bytes")
     }
 
     fn visit_borrowed_bytes<E: serde::de::Error>(self, v: &'de [u8]) -> Result<Self::Value, E> {
@@ -245,6 +245,10 @@ impl<'de> serde::de::Visitor<'de> for CompactNodesListDeserializerVisitor {
         } else {
             Err(E::invalid_length(v.len(), &"divisible by 26 bytes"))
         }
+    }
+
+    fn visit_borrowed_str<E: serde::de::Error>(self, v: &'de str) -> Result<Self::Value, E> {
+        self.visit_borrowed_bytes(v.as_bytes())
     }
 }
 

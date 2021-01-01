@@ -17,6 +17,7 @@ serde_bytes = "0.11"
 static_assertions = "*"
 serde = { path = "../serde/serde", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
+crc32c-hw = "0.1"
 
 [patch.crates-io]
 serde = { path = "../serde/serde" }

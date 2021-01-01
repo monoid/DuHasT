@@ -92,7 +92,7 @@ impl QueryQueue {
 
             node_queue.get_next_id()
         };
-        let id_bytes = id.to_ne_bytes();
+        let id_bytes = id.to_be_bytes();
 
         let out_msg = dht::OutgoingMessage {
             t: Cow::Borrowed(&id_bytes),

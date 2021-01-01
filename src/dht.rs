@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddrV4;
 
@@ -365,9 +366,9 @@ pub(crate) struct Config {
 }
 
 impl Config {
-    pub(crate) fn new<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    pub(crate) fn new<R: Rng + CryptoRng>(rng: &mut R, self_ip: IpAddr) -> Self {
         Config {
-            dht_id: DhtId::new(rng),
+            dht_id: crate::bep_0042::gen_self_id(self_ip, rng),
             peers: vec![],
         }
     }

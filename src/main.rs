@@ -6,15 +6,26 @@ use tokio::net::UdpSocket;
 
 mod dht;
 mod query_queue;
+mod bep_0042;
 
 #[tokio::main]
 async fn main() {
     // We do not bother with async read/write for config.
     let mut chacha = dht::init_chacha();
+
+    let results = Arc::new(std::sync::Mutex::new(Vec::<(dht::DhtId, SocketAddr)>::new()));
+    let results1 = results.clone();
+
+    let local = tokio::net::lookup_host("192.168.0.26:4242")
+        .await
+        .unwrap()
+        .next()
+        .unwrap();
+
     let cfg = if Path::new(dht::DEFAULT_STATE_PATH).exists() {
         dht::Config::load(dht::DEFAULT_STATE_PATH).unwrap()
     } else {
-        dht::Config::new(&mut chacha)
+        dht::Config::new(&mut chacha, local.ip())
     };
     cfg.write(dht::DEFAULT_STATE_PATH).unwrap();
     println!("{}", cfg.dht_id);
@@ -22,15 +33,7 @@ async fn main() {
     let self_id1 = cfg.dht_id.clone();
     let self_id2 = cfg.dht_id.clone();
 
-    // // Test message to the local client.  Just to make sure it works!
-    // const LOCAL_PORT: u16 = 4242;
-    // const REMOTE_PORT: u16 = 7881;
-    // const THE_IP: &str = "localhost";
-
-    let results = Arc::new(std::sync::Mutex::new(Vec::<(dht::DhtId, SocketAddr)>::new()));
-    let results1 = results.clone();
-
-    let udp = Arc::new(UdpSocket::bind("192.168.0.26:4242").await.unwrap());
+    let udp = Arc::new(UdpSocket::bind(local).await.unwrap());
     let udp1 = udp.clone();
     let udp2 = udp.clone();
 

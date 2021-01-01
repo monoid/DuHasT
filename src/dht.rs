@@ -27,7 +27,7 @@ type NodeBuf = [u8; NODE_ADDR_BYTE_SIZE];
 type ContactIdBuf = [u8; COMPACT_NODE_BYTE_SIZE];
 
 /// 20-byte node id/torrent id.
-#[derive(Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq, Ord, PartialOrd)]
 pub(crate) struct DhtId(pub(crate) KeyBuf);
 
 impl DhtId {
@@ -201,7 +201,7 @@ impl CompactNode {
 pub(crate) struct CompactNodesList<'msg>(Cow<'msg, [u8]>);
 
 impl<'msg> CompactNodesList<'msg> {
-    fn iter(&'msg self) -> impl Iterator<Item = CompactNode> + 'msg {
+    pub(crate) fn iter(&'msg self) -> impl Iterator<Item = CompactNode> + 'msg {
         self.0
             .chunks(COMPACT_NODE_BYTE_SIZE)
             .map(CompactNode::unpack)
@@ -302,19 +302,19 @@ pub(crate) struct PingResponse {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
 pub(crate) struct FindNodeResponse<'msg> {
-    id: DhtId,
+    pub(crate) id: DhtId,
     #[serde(borrow)]
-    nodes: CompactNodesList<'msg>,
+    pub(crate) nodes: CompactNodesList<'msg>,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub(crate) struct GetPeersResponse<'msg> {
-    id: DhtId,
+    pub(crate) id: DhtId,
     #[serde(borrow)]
-    token: Cow<'msg, [u8]>,
-    values: Option<Vec<NodeAddr>>,
+    pub(crate) token: Cow<'msg, [u8]>,
+    pub(crate) values: Option<Vec<NodeAddr>>,
     #[serde(borrow)]
-    nodes: Option<CompactNodesList<'msg>>,
+    pub(crate) nodes: Option<CompactNodesList<'msg>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]

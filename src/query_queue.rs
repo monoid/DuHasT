@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
-use tokio::sync::Mutex;
+use std::sync::Mutex as StdMutex;
 
 struct TimeoutError {}
 
@@ -68,14 +68,14 @@ impl Default for NodeQueue {
 pub struct QueryQueue {
     timeout: Duration,
     // A std mutex can be used instead.
-    nodes: Mutex<HashMap<SocketAddr, NodeQueue>>,
+    nodes: StdMutex<HashMap<SocketAddr, NodeQueue>>,
 }
 
 impl QueryQueue {
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
-            nodes: Mutex::new(Default::default()),
+            nodes: StdMutex::new(Default::default()),
         }
     }
 
@@ -87,7 +87,9 @@ impl QueryQueue {
     ) -> Result<Vec<u8>, ()> {
         let (send, recv) = oneshot::channel();
         let id = {
-            let mut guard = self.nodes.lock().await;
+            // expect is reasonable here because if nodes lock is poisoned,
+            // we can only crash.
+            let mut guard = self.nodes.lock().expect("cannot handle poinsoned lock");
             let node_queue = guard.entry(sock_addr).or_default();
 
             node_queue.get_next_id()
@@ -103,7 +105,7 @@ impl QueryQueue {
             udp.send_to(&buf, sock_addr).await.map_err(|_| ())?;
 
             {
-                let mut guard = self.nodes.lock().await;
+                let mut guard = self.nodes.lock().expect("cannot handle poinsoned lock");
                 let node_queue = guard.entry(sock_addr).or_default();
                 node_queue.add_reply_info(id, send);
             }
@@ -116,7 +118,7 @@ impl QueryQueue {
                 }
                 _ = tokio::time::sleep(timeout) => {
                     // clear
-                    self.query_expired(sock_addr, id).await;
+                    self.query_expired(sock_addr, id);
                     Err(())
                 }
             }
@@ -125,16 +127,16 @@ impl QueryQueue {
         }
     }
 
-    async fn query_expired(&self, addr: SocketAddr, id: QueryId) {
-        let mut guard = self.nodes.lock().await;
+    fn query_expired(&self, addr: SocketAddr, id: QueryId) {
+        let mut guard = self.nodes.lock().expect("cannot handle poinsoned lock");
         if let Some(node_queue) = guard.get_mut(&addr) {
             node_queue.remove(id);
         }
     }
 
     // It handles only normal replies and error replies.
-    pub(crate) async fn got_reply(&self, sock_addr: SocketAddr, id: QueryId, packet: Vec<u8>) {
-        let mut guard = self.nodes.lock().await;
+    pub(crate) fn got_reply(&self, sock_addr: SocketAddr, id: QueryId, packet: Vec<u8>) {
+        let mut guard = self.nodes.lock().expect("cannot handle poinsoned lock");
         if let Some(node_info) = guard.get_mut(&sock_addr) {
             node_info.got_reply(id, packet)
         } else {
@@ -144,6 +146,8 @@ impl QueryQueue {
     }
 
     pub(crate) async fn declare_dead(&self, sock_addr: SocketAddr) {
-        self.nodes.lock().await.remove(&sock_addr);
+        self.nodes.lock()
+            .expect("cannot handle poinsoned lock")
+            .remove(&sock_addr);
     }
 }

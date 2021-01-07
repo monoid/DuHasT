@@ -61,7 +61,7 @@ async fn main() {
         let udp11 = udp1.clone();
         match qq1.send_message(udp1, remote1, msg1).await {
             Ok(resp) => {
-                let msg = serde_bencoded::from_bytes::<dht::Message<dht::FindNodeResponse>>(&resp)
+                let msg = serde_bencoded::from_bytes_auto::<dht::Message<dht::FindNodeResponse>>(&resp)
                     .unwrap();
                 eprintln!("{:?}", msg);
                 if let dht::Message::R {
@@ -151,7 +151,7 @@ async fn main() {
                 let id = query_queue::QueryId::from_ne_bytes([resp.t[0], resp.t[1]]);
 
                 if (resp.y == "r") | (resp.y == "e") {
-                    qq.got_reply(from, id, data).await;
+                    qq.got_reply(from, id, data);
                 } else {
                     // TODO We should reply with some kind of error.
                     eprintln!("WARNING: ignoring yet message with y={}", resp.y);

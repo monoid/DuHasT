@@ -377,7 +377,7 @@ impl Config {
         let mut file = File::open(filename).unwrap();
         let mut config_data = vec![];
         file.read_to_end(&mut config_data).unwrap();
-        serde_bencoded::from_bytes::<Config>(&config_data)
+        serde_bencoded::from_bytes_auto::<Config>(&config_data)
     }
 
     pub(crate) fn write(&self, filename: &str) -> Result<(), serde_bencoded::SerError> {
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn test_unpack_incoming_msg() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:y1:q1:t2:\xFF\xFFe";
-        let ping: IncomingMessage = serde_bencoded::from_bytes(&DATA)?;
+        let ping: IncomingMessage = serde_bencoded::from_bytes_auto(&DATA)?;
 
         assert_eq!(
             ping,
@@ -418,7 +418,7 @@ mod tests {
     fn test_unpack_ping_query() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
             b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping1:t2:aa1:y1:q1:t2:\xFF\xFFe";
-        let ping: Message<()> = serde_bencoded::from_bytes(&DATA)?;
+        let ping: Message<()> = serde_bencoded::from_bytes_auto(&DATA)?;
 
         assert_eq!(
             ping,
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_unpack_find_node_query() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:ad2:id20:abcdefghij01234567896:target20:mnopqrstuvwxyz123456e1:q9:find_node1:t2:aa1:y1:qe";
-        let find_node: Message<()> = serde_bencoded::from_bytes(&DATA)?;
+        let find_node: Message<()> = serde_bencoded::from_bytes_auto(&DATA)?;
 
         assert_eq!(
             find_node,
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn test_unpack_get_peers_query() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:ad2:id20:abcdefghij01234567899:info_hash20:mnopqrstuvwxyz123456e1:q9:get_peers1:t2:aa1:y1:qe";
-        let get_peers: Message<()> = serde_bencoded::from_bytes(&DATA)?;
+        let get_peers: Message<()> = serde_bencoded::from_bytes_auto(&DATA)?;
         assert_eq!(
             get_peers,
             Message::Q(Query::GetPeers(GetPeersQuery {
@@ -461,7 +461,7 @@ mod tests {
     #[test]
     fn test_unpack_announce_peer_query() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:ad2:id20:abcdefghij012345678912:implied_porti1e9:info_hash20:mnopqrstuvwxyz1234564:porti6881e5:token8:aoeusnthe1:q13:announce_peer1:t2:aa1:y1:qe";
-        let announce_peer: Message<()> = serde_bencoded::from_bytes(&DATA)?;
+        let announce_peer: Message<()> = serde_bencoded::from_bytes_auto(&DATA)?;
         assert_eq!(
             announce_peer,
             Message::Q(Query::AnnouncePeer(AnnouncePeerQuery {
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_unpack_ping_response() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:rd2:id20:mnopqrstuvwxyz123456e1:t2:aa1:y1:re";
-        let ping: Message<PingResponse> = serde_bencoded::from_bytes(&DATA)?;
+        let ping: Message<PingResponse> = serde_bencoded::from_bytes_auto(&DATA)?;
         assert_eq!(
             ping,
             Message::R {
@@ -494,7 +494,7 @@ mod tests {
     fn test_unpack_find_node_response() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
             b"d1:rd2:id20:0123456789abcdefghij5:nodes26:01234567890123456789abcdefe1:t2:aa1:y1:re";
-        let find_node: Message<FindNodeResponse> = serde_bencoded::from_bytes(&DATA)?;
+        let find_node: Message<FindNodeResponse> = serde_bencoded::from_bytes_auto(&DATA)?;
         assert_eq!(
             find_node,
             Message::R {
@@ -513,7 +513,7 @@ mod tests {
     fn test_unpack_get_peers_response_values() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
     b"d1:rd2:id20:abcdefghij01234567895:token8:aoeusnth6:valuesl6:axje.u6:idhtnmee1:t2:aa1:y1:re";
-        let get_peers: Message<GetPeersResponse> = serde_bencoded::from_bytes(DATA)?;
+        let get_peers: Message<GetPeersResponse> = serde_bencoded::from_bytes_auto(DATA)?;
         assert_eq!(
             get_peers,
             Message::R {
@@ -535,7 +535,7 @@ mod tests {
     fn test_unpack_get_peers_response_nodes() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] =
     b"d1:rd2:id20:abcdefghij01234567895:token8:aoeusnth5:nodes26:01234567890123456789012345e1:t2:aa1:y1:re";
-        let get_peers: Message<GetPeersResponse> = serde_bencoded::from_bytes(DATA)?;
+        let get_peers: Message<GetPeersResponse> = serde_bencoded::from_bytes_auto(DATA)?;
         assert_eq!(
             get_peers,
             Message::R {
@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn test_unpack_announce_peer_response() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:rd2:id20:mnopqrstuvwxyz123456e1:t2:aa1:y1:re";
-        let announce_peers: Message<AnnouncePeerResponse> = serde_bencoded::from_bytes(DATA)?;
+        let announce_peers: Message<AnnouncePeerResponse> = serde_bencoded::from_bytes_auto(DATA)?;
         assert_eq!(
             announce_peers,
             Message::R {
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn test_unpack_error_response() -> Result<(), Box<dyn Error>> {
         const DATA: &[u8] = b"d1:eli201e23:A Generic Error Ocurrede1:t2:aa1:y1:ee";
-        let err: Message<PingResponse> = serde_bencoded::from_bytes(DATA)?;
+        let err: Message<PingResponse> = serde_bencoded::from_bytes_auto(DATA)?;
 
         assert!(matches!(dbg!(err), Message::E{e: (201, _)}));
         Ok(())

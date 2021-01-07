@@ -11,14 +11,9 @@ arrayvec = "0.5"
 rand = "^0.7.0"
 rand_core = "^0.5.1"
 rand_chacha = "^0.2.2"
-# serde_bencoded = "^0.1.1"
-serde_bencoded = { path = "../serde_bencoded" }
+serde_bencoded = "0.2"
 serde_bytes = "0.11"
-# serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 static_assertions = "*"
-serde = { path = "../serde/serde", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
 crc32c-hw = "0.1"
-
-[patch.crates-io]
-serde = { path = "../serde/serde" }

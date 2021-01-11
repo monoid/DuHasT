@@ -349,6 +349,7 @@ pub(crate) struct IncomingMessage<'msg> {
     pub(crate) y: &'msg str,
     #[serde(borrow, with = "serde_bytes")]
     pub(crate) t: &'msg [u8],
+    pub(crate) ro: Option<bool>,
 }
 
 #[derive(Serialize, Debug)]
@@ -408,7 +409,25 @@ mod tests {
             ping,
             IncomingMessage {
                 y: "q",
-                t: b"\xFF\xFF"
+                t: b"\xFF\xFF",
+                ro: None,
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_unpack_incoming_msg_ro() -> Result<(), Box<dyn Error>> {
+        const DATA: &[u8] =
+            b"d1:ad2:id20:\xFFbcdefghij0123456789e1:q4:ping2:roi1e1:y1:q1:t2:\xFF\xFFe";
+        let ping: IncomingMessage = serde_bencoded::from_bytes_auto(&DATA)?;
+
+        assert_eq!(
+            ping,
+            IncomingMessage {
+                y: "q",
+                t: b"\xFF\xFF",
+                ro: Some(true),
             }
         );
         Ok(())

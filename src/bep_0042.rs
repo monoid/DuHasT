@@ -1,20 +1,27 @@
 use crate::dht::DhtId;
+use arrayvec::ArrayVec;
 use crc32c_hw;
 use rand::{CryptoRng, Rng};
 use std::net::IpAddr;
-use arrayvec::ArrayVec;
-
 
 pub(crate) fn get_crc(ip: IpAddr, r: u8) -> u32 {
     match ip {
         IpAddr::V4(v4) => {
-            let mut masked: ArrayVec<[u8; 4]> = [0x03u8, 0x0f, 0x3f, 0xff].iter().zip(&v4.octets()).map(|(a, b)| a & b).collect();
+            let mut masked: ArrayVec<[u8; 4]> = [0x03u8, 0x0f, 0x3f, 0xff]
+                .iter()
+                .zip(&v4.octets())
+                .map(|(a, b)| a & b)
+                .collect();
             masked[0] |= r << 5;
 
             crc32c_hw::compute(masked)
         }
         IpAddr::V6(v6) => {
-            let mut masked: ArrayVec<[u8; 8]> = [0x01u8, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff].iter().zip(&v6.octets()).map(|(a, b)| a & b).collect();
+            let mut masked: ArrayVec<[u8; 8]> = [0x01u8, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff]
+                .iter()
+                .zip(&v6.octets())
+                .map(|(a, b)| a & b)
+                .collect();
             masked[0] |= r << 5;
             crc32c_hw::compute(&masked)
         }

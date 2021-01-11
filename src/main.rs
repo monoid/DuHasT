@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
 
+mod bep_0042;
 mod dht;
 mod query_queue;
-mod bep_0042;
 
 #[tokio::main]
 async fn main() {
@@ -61,8 +61,9 @@ async fn main() {
         let udp11 = udp1.clone();
         match qq1.send_message(udp1, remote1, msg1).await {
             Ok(resp) => {
-                let msg = serde_bencoded::from_bytes_auto::<dht::Message<dht::FindNodeResponse>>(&resp)
-                    .unwrap();
+                let msg =
+                    serde_bencoded::from_bytes_auto::<dht::Message<dht::FindNodeResponse>>(&resp)
+                        .unwrap();
                 eprintln!("{:?}", msg);
                 if let dht::Message::R {
                     r: dht::FindNodeResponse { id: _, nodes },
@@ -76,6 +77,12 @@ async fn main() {
                     }
                     for node in nodes.iter() {
                         let results = results1.clone();
+                        let udp11 = udp11.clone();
+                        let qq11 = qq11.clone();
+                        let self_id1 = self_id1.clone();
+                        eprintln!("Send to node: {:?}:{}", node.ip, node.port);
+                        let ip = node.ip;
+                        let port = node.port;
 
                         let msg1 =
                             dht::Message::<()>::Q(dht::Query::FindNode(dht::FindNodeQuery {
@@ -83,34 +90,37 @@ async fn main() {
                                 // target: dht::DhtId::new(&mut chacha),
                                 target: self_id1.clone(),
                             }));
-                        match qq11
-                            .clone()
-                            .send_message(udp11.clone(), (node.ip, node.port).into(), msg1)
-                            .await
-                        {
-                            Ok(resp) => {
-                                let msg = serde_bencoded::from_bytes::<
-                                    dht::Message<dht::FindNodeResponse>,
-                                >(&resp)
-                                .unwrap();
-                                eprintln!("{:?}", msg);
-                                if let dht::Message::R {
-                                    r: dht::FindNodeResponse { id: _, nodes },
-                                } = &msg
-                                {
+                        tokio::task::spawn(async move {
+                            eprintln!("Send to node: {:?}:{}", node.ip, node.port);
+                            match qq11
+                                .clone()
+                                .send_message(udp11.clone(), (ip, port).into(), msg1)
+                                .await
+                            {
+                                Ok(resp) => {
+                                    let msg = serde_bencoded::from_bytes_auto::<
+                                        dht::Message<dht::FindNodeResponse>,
+                                    >(&resp)
+                                    .unwrap();
+                                    eprintln!("{:?}", msg);
+                                    if let dht::Message::R {
+                                        r: dht::FindNodeResponse { id: _, nodes },
+                                    } = &msg
                                     {
-                                        let mut results = results.lock().unwrap();
-                                        for node in nodes.iter() {
-                                            results.push((
-                                                node.id.clone(),
-                                                (node.ip, node.port).into(),
-                                            ));
+                                        {
+                                            let mut results = results.lock().unwrap();
+                                            for node in nodes.iter() {
+                                                results.push((
+                                                    node.id.clone(),
+                                                    (node.ip, node.port).into(),
+                                                ));
+                                            }
                                         }
                                     }
                                 }
+                                Err(_) => eprintln!("ERROR"),
                             }
-                            Err(_) => eprintln!("ERROR"),
-                        }
+                        });
                     }
                 }
             }
@@ -128,8 +138,9 @@ async fn main() {
 
         match qq2.send_message(udp2, remote2, msg2).await {
             Ok(resp) => {
-                let msg = serde_bencoded::from_bytes::<dht::Message<dht::FindNodeResponse>>(&resp)
-                    .unwrap();
+                let msg =
+                    serde_bencoded::from_bytes_auto::<dht::Message<dht::FindNodeResponse>>(&resp)
+                        .unwrap();
                 eprintln!("{:?}", msg);
             }
             Err(_) => eprintln!("ERROR"),
@@ -147,8 +158,8 @@ async fn main() {
                 let (len, from) = res.unwrap();
                 data.resize(len, 0);
 
-                let resp: dht::IncomingMessage = serde_bencoded::from_bytes(&data[..len]).unwrap();
-                let id = query_queue::QueryId::from_ne_bytes([resp.t[0], resp.t[1]]);
+                let resp: dht::IncomingMessage = serde_bencoded::from_bytes_auto(&data[..len]).unwrap();
+                let id = query_queue::QueryId::from_be_bytes([resp.t[0], resp.t[1]]);
 
                 if (resp.y == "r") | (resp.y == "e") {
                     qq.got_reply(from, id, data);

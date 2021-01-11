@@ -4,10 +4,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
-use std::sync::Mutex as StdMutex;
 
 struct TimeoutError {}
 
@@ -146,7 +146,8 @@ impl QueryQueue {
     }
 
     pub(crate) async fn declare_dead(&self, sock_addr: SocketAddr) {
-        self.nodes.lock()
+        self.nodes
+            .lock()
             .expect("cannot handle poinsoned lock")
             .remove(&sock_addr);
     }
